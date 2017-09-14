@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Net.Http;
 using Windows.ApplicationModel.Background;
+using Windows.Devices.Gpio;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -51,9 +52,25 @@ namespace TCPClientCore
             var tcpClient = new TcpClient();
             try
             {
-                await tcpClient.ConnectAsync("192.168.137.1", 25000);
+                await tcpClient.ConnectAsync("192.168.1.71", 25000);
+                var controller = GpioController.GetDefault();
 
-                return tcpClient.GetStream();
+                if (tcpClient.Connected)
+                {
+                    var pin = controller.OpenPin(21);
+                    pin.SetDriveMode(GpioPinDriveMode.Output);
+                    pin.Write(GpioPinValue.High);
+
+                    return tcpClient.GetStream();
+                }
+                else
+                {
+                    var pin = controller.OpenPin(120);
+                    pin.SetDriveMode(GpioPinDriveMode.Output);
+                    pin.Write(GpioPinValue.High);
+
+                    return null;
+                }
             }
             catch(SocketException ex)
             {
