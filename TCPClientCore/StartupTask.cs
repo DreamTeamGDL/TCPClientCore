@@ -9,9 +9,12 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using System.Net;
+using Windows.Networking;
+using Windows.Networking.Sockets;
 
 using TCPClientCore.Services;
 using TCPClientCore.Services.Interfaces;
+using System.IO;
 
 namespace TCPClientCore
 {
@@ -26,6 +29,7 @@ namespace TCPClientCore
 
             _serializer = new Serializer();
 
+            /*
             var negotiateTask = Negotiate();
             negotiateTask.Wait();
 
@@ -33,6 +37,7 @@ namespace TCPClientCore
             connectTask.Wait();
 
             var mainTask = Listen(connectTask.Result ?? throw new Exception());
+            */
         }
 
         private async Task Configure(NetworkStream stream)
@@ -79,15 +84,8 @@ namespace TCPClientCore
             }
         }
 
-        private async Task<IPEndPoint> Negotiate()
+        private async Task Negotiate()
         {
-            var client = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-
-            await client.ConnectAsync(new IPEndPoint(IPAddress.Broadcast, 25500));
-
-            var groupEP = new IPEndPoint(IPAddress.Any, 0);
-            bool done = false;
-
             var message = new ActionMessage
             {
                 Action = ACTION.HELLO,
@@ -95,34 +93,57 @@ namespace TCPClientCore
                 Name = ""
             };
 
-            var serializedMessage = _serializer.Serialize(message);
-            
-            var size = await client.SendToAsync(serializedMessage, SocketFlags.Broadcast, new IPEndPoint(IPAddress.Broadcast, 25500));
+            var udpSocket = new DatagramSocket();
+            udpSocket.MessageReceived += UdpSocket_MessageReceived;
 
-            IPEndPoint endPoint = null;
+            var hostName = new HostName(IPAddress.Broadcast.ToString());
 
-            try
-            {
-                while (!done)
-                {
-                    var bytes = await client.ReceiveAsync();
-                    var obj = _serializer.Deserialize(bytes.Buffer) as ActionMessage;
-                    done = true;
-                    
-                    if(IPAddress.TryParse(obj.Name, out var address))
-                    {
-                        endPoint = new IPEndPoint(address, Convert.ToInt32(obj.Do));
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            var output = (await udpSocket.GetOutputStreamAsync(hostName, "25500")).AsStreamForWrite();
+            var json = JsonConvert.SerializeObject(message);
 
-            return endPoint;
+            var writter = new StreamWriter(output);
+            await writter.WriteLineAsync(json);
+            await writter.FlushAsync();
         }
-        
+
+        private async Task ConnectToTcp(string ip, string port)
+        {
+            var message = new ActionMessage
+            {
+                Action = ACTION.CONFIGURE,
+                Do = "",
+                Name = ""
+            };
+
+            var socket = new StreamSocket();
+            var serverHost = new HostName(ip);
+
+            await socket.ConnectAsync(serverHost, port);
+
+            var streamOut = socket.OutputStream.AsStreamForWrite();
+            var streamWritter = new StreamWriter(streamOut);
+            await streamWritter.WriteLineAsync(JsonConvert.SerializeObject(message));
+            await streamWritter.FlushAsync();
+
+            var streamIn = socket.InputStream.AsStreamForRead();
+            var reader = new StreamReader(streamIn);
+            var json = await reader.ReadLineAsync();
+
+            message = JsonConvert.DeserializeObject<ActionMessage>(json);
+        }
+
+        private async void UdpSocket_MessageReceived(DatagramSocket sender, DatagramSocketMessageReceivedEventArgs args)
+        {
+            var streamIn = args.GetDataStream().AsStreamForRead();
+            var reader = new StreamReader(streamIn);
+            var message = JsonConvert.DeserializeObject<ActionMessage>(await reader.ReadLineAsync()); 
+
+            if(message.Action == ACTION.CONNECT)
+            {
+                var task = ConnectToTcp(message.Name, message.Do);
+            }
+        }
+
         private async Task<NetworkStream> GetStream(IPEndPoint endPoint)
         {
             var tcpClient = new TcpClient();
