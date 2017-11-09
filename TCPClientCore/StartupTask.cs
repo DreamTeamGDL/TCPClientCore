@@ -21,6 +21,7 @@ namespace TCPClientCore
     public sealed class StartupTask : IBackgroundTask
     {
         BackgroundTaskDeferral _deferral;
+        DatagramSocket socket;
         ISerializer _serializer;
 
         public void Run(IBackgroundTaskInstance taskInstance)
@@ -28,6 +29,10 @@ namespace TCPClientCore
             _deferral = taskInstance.GetDeferral();
 
             _serializer = new Serializer();
+
+            socket = new DatagramSocket();
+            socket.MessageReceived += MessageReceived;
+            socket.BindServiceNameAsync("25500");
 
             /*
             var negotiateTask = Negotiate();
@@ -38,6 +43,11 @@ namespace TCPClientCore
 
             var mainTask = Listen(connectTask.Result ?? throw new Exception());
             */
+        }
+
+        private void MessageReceived(DatagramSocket sender, DatagramSocketMessageReceivedEventArgs args)
+        {
+
         }
 
         private async Task Configure(NetworkStream stream)
