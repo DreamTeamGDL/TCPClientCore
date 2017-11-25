@@ -95,8 +95,13 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="LLClients\TcpServer.cs" />
+    <Compile Include="LLClients\UdpServer.cs" />
+    <Compile Include="Models\Configs\ClientConfig.cs" />
+    <Compile Include="Models\Configs\MainConfig.cs" />
     <Compile Include="Services\Interfaces\ISerializer.cs" />
     <Compile Include="Services\Serializer.cs" />
+    <Compile Include="SkynetClient\SkynetAPI.cs" />
     <Compile Include="StartupTask.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -138,6 +143,7 @@
       <Version>10.0.3</Version>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '15.0' ">
     <VisualStudioVersion>15.0</VisualStudioVersion>
   </PropertyGroup>
